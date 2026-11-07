@@ -6,3 +6,15 @@ results_from_file/
 evaluation_part0.py
 spar_summary.png
 spar_summary_part0.png
+# designs kept locally only (removed from the repo)
+designs/D1.py
+designs/D2.py
+designs/D2T_134ribs.py
+designs/D2T_134ribs_titanium.py
+designs/D2T_34ribs.py
+designs/D2T_84ribs.py
+designs/D2_34ribs.py
+designs/D3.py
+designs/D4.py
+designs/D5.py
+designs/D6.py

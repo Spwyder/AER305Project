@@ -68,7 +68,7 @@
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".py,.txt,text/x-python,text/plain">
       <div><strong>Choose a design file</strong> or drag it here</div>
-      <div class="meta">e.g. <code>D2T_134ribs.py</code></div>
+      <div class="meta">a <code>.py</code> file containing only the design block</div>
     </label>
     <div class="row" id="examplesRow">
       <label for="examples" class="meta">Or run one from the repo:</label>
@@ -95,7 +95,7 @@
   <section class="panel">
     <strong>Writing a design file</strong>
     <ol class="meta">
-      <li>Start from one in the repo's <code>designs/</code> folder (pick it above, then open “Design file that was run” to copy it).</li>
+      <li>Start from the blank design file you were sent (replace each <code>FILL_IN</code>) or from an existing design file.</li>
       <li>It must define everything the design block defines: <code>rhoSpar, E, stressYield, pricePerPound, strDistances, nStringers,
         strA, strI, strIt, ribLocations, ribsWeight, I, It, h, ht, area</code>. You can use <code>np</code>, <code>chord(x)</code>,
         <code>lWing</code>, <code>halfSpan</code> and the other names defined above the block.</li>
