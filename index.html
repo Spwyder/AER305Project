@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spar Design Evaluator</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1b1f24; --muted: #5b6470; --border: #d9dde3;
+    --accent: #2457c5; --accent-text: #ffffff; --ok: #1d7a46; --err: #b42318; --err-bg: #fdecea; --code-bg: #f1f3f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171b; --panel: #1c2026; --text: #e6e9ed; --muted: #9aa4b0; --border: #333a43;
+      --accent: #6b9bff; --accent-text: #0d1117; --ok: #4cc38a; --err: #ff8a80; --err-bg: #3a1d1b; --code-bg: #242a31;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171b; --panel: #1c2026; --text: #e6e9ed; --muted: #9aa4b0; --border: #333a43;
+    --accent: #6b9bff; --accent-text: #0d1117; --ok: #4cc38a; --err: #ff8a80; --err-bg: #3a1d1b; --code-bg: #242a31;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 16px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 22px; max-width: 70ch; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  .drop { display: block; border: 2px dashed var(--border); border-radius: 10px; padding: 26px 16px; text-align: center; cursor: pointer;
+          transition: border-color .15s, background .15s; }
+  .drop.over, .drop:hover { border-color: var(--accent); }
+  .drop strong { color: var(--accent); }
+  .drop input { display: none; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  select, button, a.btn { font: inherit; border-radius: 7px; border: 1px solid var(--border); padding: 7px 12px;
+                          background: var(--panel); color: var(--text); }
+  button.primary, a.btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  a.btn { text-decoration: none; display: inline-block; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #status { display: flex; align-items: center; gap: 10px; color: var(--muted); min-height: 1.5em; }
+  #status.err { color: var(--err); }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 0 0 16px; }
+  .stat { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .stat .k { color: var(--muted); font-size: .82rem; }
+  .stat .v { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .report img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--border); background: #fff; }
+  pre { background: var(--code-bg); border-radius: 8px; padding: 12px; overflow-x: auto; font-size: .85rem; margin: 8px 0 0; }
+  pre.error { background: var(--err-bg); color: var(--err); white-space: pre-wrap; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .meta { color: var(--muted); font-size: .85rem; }
+  .hidden { display: none !important; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  ol { padding-left: 1.2em; margin: 6px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spar Design Evaluator</h1>
+  <p class="lede">Upload a design file and this page runs it through the repo's <code>evaluation.py</code>, right in your browser,
+    and shows the report sheet. A design file holds only the design block: the lines that go between the two
+    <code>#=====</code> lines in <code>evaluation.py</code>.</p>
+
+  <section class="panel">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".py,.txt,text/x-python,text/plain">
+      <div><strong>Choose a design file</strong> or drag it here</div>
+      <div class="meta">e.g. <code>D2T_134ribs.py</code></div>
+    </label>
+    <div class="row" id="examplesRow">
+      <label for="examples" class="meta">Or run one from the repo:</label>
+      <select id="examples"><option value="">Loading list…</option></select>
+      <button id="runExample" disabled>Run</button>
+    </div>
+    <div class="row"><div id="status"><span class="spinner"></span><span id="statusText">Starting…</span></div></div>
+  </section>
+
+  <section class="panel hidden" id="resultPanel">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <div><strong id="resultName"></strong> <span class="meta" id="resultMeta"></span></div>
+      <a class="btn primary hidden" id="download" download>Download PNG</a>
+    </div>
+    <div id="errorBox" class="hidden"><pre class="error" id="errorText"></pre></div>
+    <div id="okBox" class="hidden">
+      <div class="stats" id="stats" style="margin-top:14px"></div>
+      <div class="report"><img id="reportImg" alt="Design report sheet"></div>
+    </div>
+    <details id="stdoutDetails"><summary>Printed output</summary><pre id="stdout"></pre></details>
+    <details><summary>Design file that was run</summary><pre id="designSrc"></pre></details>
+  </section>
+
+  <section class="panel">
+    <strong>Writing a design file</strong>
+    <ol class="meta">
+      <li>Start from one in the repo's <code>designs/</code> folder (pick it above, then open “Design file that was run” to copy it).</li>
+      <li>It must define everything the design block defines: <code>rhoSpar, E, stressYield, pricePerPound, strDistances, nStringers,
+        strA, strI, strIt, ribLocations, ribsWeight, I, It, h, ht, area</code>. You can use <code>np</code>, <code>chord(x)</code>,
+        <code>lWing</code>, <code>halfSpan</code> and the other names defined above the block.</li>
+      <li>No account needed. Files you upload are only run in your own browser and aren't saved anywhere, so keep your copy.</li>
+    </ol>
+  </section>
+  <p class="meta" id="footer"></p>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const worker = new Worker("web/worker.js");
+  let ready = false, busy = false, runId = 0, started = 0, timer = null, lastUrl = null;
+
+  function setStatus(text, { spin = false, error = false } = {}) {
+    $("statusText").textContent = text;
+    $("status").classList.toggle("err", error);
+    $("status").querySelector(".spinner").classList.toggle("hidden", !spin);
+  }
+  function setBusy(b) {
+    busy = b;
+    $("runExample").disabled = b || !ready || !$("examples").value;
+    $("file").disabled = b;
+  }
+
+  worker.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === "status") setStatus(m.text + (busy ? ` (${((Date.now() - started) / 1000).toFixed(0)} s)` : ""), { spin: true });
+    else if (m.type === "ready") { ready = true; setBusy(busy); if (!busy) setStatus("Ready. Choose a design file."); }
+    else if (m.type === "fatal") setStatus("Could not start Python: " + m.text, { error: true });
+    else if (m.type === "result" && m.id === runId) showResult(m);
+  };
+
+  function run(name, text) {
+    runId += 1; started = Date.now(); setBusy(true);
+    clearInterval(timer);
+    timer = setInterval(() => {
+      const t = $("statusText").textContent.replace(/ \(\d+ s\)$/, "");
+      setStatus(`${t} (${((Date.now() - started) / 1000).toFixed(0)} s)`, { spin: true });
+    }, 1000);
+    setStatus(ready ? "Running evaluation.py…" : "Starting Python (first run takes a little longer)…", { spin: true });
+    $("resultName").textContent = name;
+    $("designSrc").textContent = text;
+    worker.postMessage({ id: runId, design: text, name });
+  }
+
+  function showResult(r) {
+    clearInterval(timer); setBusy(false);
+    const secs = ((Date.now() - started) / 1000).toFixed(1);
+    $("resultPanel").classList.remove("hidden");
+    $("resultMeta").textContent = r.evalSha ? `· evaluation.py ${r.evalSha} · ${secs} s` : "";
+    $("stdout").textContent = r.stdout || "(nothing printed)";
+    $("errorBox").classList.toggle("hidden", r.ok);
+    $("okBox").classList.toggle("hidden", !r.ok);
+    $("download").classList.toggle("hidden", !r.ok);
+    if (!r.ok) {
+      $("errorText").textContent = r.error;
+      setStatus("The design file raised an error. Details below.", { error: true });
+      $("resultPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    const bytes = Uint8Array.from(atob(r.png), (c) => c.charCodeAt(0));
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+    $("reportImg").src = lastUrl;
+    $("download").href = lastUrl;
+    $("download").download = $("resultName").textContent.replace(/\.(py|txt)$/i, "") + "_report.png";
+    const stats = $("stats"); stats.replaceChildren();
+    for (const [k, v] of Object.entries(r.summary || {})) {
+      const d = document.createElement("div"); d.className = "stat";
+      d.innerHTML = '<div class="k"></div><div class="v"></div>';
+      d.querySelector(".k").textContent = k; d.querySelector(".v").textContent = v;
+      stats.appendChild(d);
+    }
+    setStatus(`Done in ${secs} s.`);
+    $("resultPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function runFile(file) {
+    if (!file || busy) return;
+    if (file.size > 200000) { setStatus("That file is too large to be a design block.", { error: true }); return; }
+    run(file.name, await file.text());
+  }
+  $("file").addEventListener("change", (e) => { runFile(e.target.files[0]); e.target.value = ""; });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => runFile(e.dataTransfer.files[0]));
+
+  // Example designs: GitHub API listing when hosted on github.io, otherwise a local directory listing.
+  async function listDesigns() {
+    const host = location.hostname;
+    if (host.endsWith(".github.io")) {
+      const owner = host.split(".")[0];
+      const repo = location.pathname.split("/").filter(Boolean)[0] || host;
+      const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/designs`);
+      if (!r.ok) throw new Error("GitHub API " + r.status);
+      return (await r.json()).filter((f) => f.type === "file" && f.name.endsWith(".py")).map((f) => f.name);
+    }
+    const r = await fetch("designs/");
+    if (!r.ok) throw new Error("no listing");
+    const html = await r.text();
+    return [...html.matchAll(/href="([^"?/]+\.py)"/g)].map((m) => decodeURIComponent(m[1]));
+  }
+  listDesigns().then((names) => {
+    if (!names.length) throw new Error("empty");
+    const sel = $("examples"); sel.replaceChildren(new Option("Select a design…", ""));
+    names.sort().forEach((n) => sel.appendChild(new Option(n, n)));
+    sel.addEventListener("change", () => setBusy(busy));
+  }).catch(() => $("examplesRow").classList.add("hidden"));
+  $("runExample").addEventListener("click", async () => {
+    const n = $("examples").value; if (!n || busy) return;
+    const r = await fetch("designs/" + encodeURIComponent(n), { cache: "no-cache" });
+    if (!r.ok) { setStatus(`Could not load designs/${n}`, { error: true }); return; }
+    run(n, await r.text());
+  });
+  setStatus("Starting Python…", { spin: true });
+})();
+</script>
+</body>
+</html>
