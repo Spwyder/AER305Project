@@ -1,6 +1,6 @@
 # Wing Spar Design Evaluator
 
-`evaluation.py` analyzes a wing-spar design: shear and bending, factor of safety vs. engine placement, deflections, weight/cost and stringer buckling. It produces a one-page report sheet.
+`evaluation.py` analyzes a wing-spar design: shear and bending, factor of safety vs. engine placement, deflections, angle of twist, weight/cost and stringer buckling. It produces a one-page report sheet.
 
 ## Run a design on the website (no install needed)
 
@@ -14,7 +14,7 @@ Uploaded files are not saved anywhere. To add a design to the dropdown, the repo
 
 A design file contains **only the design block**: the lines that go between the two `#=====` lines under `#design parameters to change!` in `evaluation.py`. See `spar_designs.md` for the design definitions.
 
-It must define: `rhoSpar, E, stressYield, pricePerPound, strDistances, nStringers, strA, strI, strIt, ribLocations, ribsWeight, I, It, h, ht, area`. It can use `np`, `chord(x)`, `lWing`, `halfSpan` and anything else defined above the block.
+It must define: `rhoSpar, E, v, G, stressYield, pricePerPound, strDistances, nStringers, strA, strI, strIt, ribLocations, ribsWeight, flangeWidth, flangeThick, webHeight, webThick, filletRadius, I, It, h, ht, area`. A blank one is in `design_template.py`; replace each `FILL_IN`. It can use `np`, `chord(x)`, `lWing`, `halfSpan` and anything else defined above the block.
 
 ## Run locally
 

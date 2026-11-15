@@ -80,6 +80,10 @@ def summary(g):
         out["Ribs"] = str(len(g["ribLocations"]))
     except Exception:
         pass
+    try:  # added in the version of evaluation.py with the angle-of-twist check
+        out["Max angle of twist (deg)"] = f"{g['twistMax']:.3f}"
+    except Exception:
+        pass
     return out
 
 

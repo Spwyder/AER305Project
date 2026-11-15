@@ -32,14 +32,24 @@ cd0 = 0.008755 #zero-lift drag coefficient
 eOswald = 0.862 #oswald efficiency factor
 AR = (2*halfSpan)**2/(2*sWing) #aspect ratio
 
-def mac(x,a,k): #define macauly function for usage later
-  return np.where(x>= a,(x- a)**k,0.0) #return (x -a)^k if x>= a, 0 otherwise. compatible with vector operations.
 
 def chord(x): #chord length in ft at distance x along the spar
   y = x*halfSpan/lWing#convert spar distance to projected span distance
   inboard  = cRoot + (cInt- cRoot)*y/yInt #root until piecewise split
   outboard = cInt + (cTip -cInt)*(y- yInt)/(halfSpan- yInt) #piecewise split to tip
   return np.where(y <= yInt, inboard, outboard) #return inboard if before split location, outboard if after
+
+armEngine = 18.5 #distance from engine CG to center of twist 
+armThrust = 3.0 #distance from thrust vector to center of twist
+armLg = (0.67-0.5)*chord(dLg) #landing gear distance aft of center of twist
+cM = -0.037 #pitching moment coefficient (nose down!!!)
+
+
+
+def mac(x,a,k): #define macauly function for usage later
+  return np.where(x>= a,(x- a)**k,0.0) #return (x -a)^k if x>= a, 0 otherwise. compatible with vector operations.
+
+
 
 
 x = np.linspace(0, lWing, 5000)   #5000 evenly spaced points from root to tip @ lWing 
@@ -49,6 +59,9 @@ leArray = np.linspace(minEngineDistance,maxEngineDistance,300) #candidate engine
 #=====================================================================
 rhoSpar = 0.1628*12**3 #density of spar material in lb/ft^3 (titanium)
 E = 16.8*144*10**6 #young's modulus in lbf/ft^2 (titanium)
+v = 0.3 #POISSON'S RATIO!
+G = E/(2*(1+v)) #CALCULUATE modulus of rigidity
+
 stressYield = 144*110*10**3#yield strength of material in lbf/ft^2 (titanium)
 pricePerPound = 50 #price per pound of material (titanium)
 
@@ -82,6 +95,25 @@ ribLocations = np.concatenate((np.array([0,33.83,20*lWing/halfSpan,117.84]), #4 
                                np.linspace(0, lWing, 132)[1:-1])) #plus 130 evenly spaced ribs between root and tip (lWing/131 = 0.900 ft apart)
 def ribsWeight(arr):
   return chord(arr)**2*0.65*0.1*0.005/12*rhoSpar-area(arr)*0.005/12*rhoSpar# return array of ribweights
+
+
+#I beam dimensions for angle of twist calc. 
+def flangeWidth(x):
+  return chord(x) #define flange width as a function of chord length
+
+def flangeThick(x):
+  return chord(x) #define flange thickness as a function of chord length
+
+def webHeight(x):
+  return chord(x) #clear flange height (total height -2*flangethickness)
+
+def webThick(x):
+  return chord(x) #define web thickness as a functionn of chord length
+
+def filletRadius(x):
+  return chord(x) #define fillet radius as a function of chord length
+  
+
 
 def I(x): #second moment of area for lift and weight direction (Iz)
   c = chord(x)
@@ -186,6 +218,40 @@ def shearBendingDrag(x,n,le, thrust): #shear and bending in drag/thrust directio
   mDrag = cumulative_trapezoid(vDrag,x,initial = 0)#moment due to drag
   
   return (-vF + vDrag + thrust*mac(x,le,0)),(mF - vF*x + mDrag + thrust*mac(x,le,1)) #return shear, moment
+
+def twistingTorque(x,n,le,thrust): #twisting torque/moment as a function of load factor, engine placement at a given x along the wing
+  engineWeightTorque = -n*wEngine*armEngine #total torque by engine weight
+  engineThrustTorque = thrust*armThrust #total torque by engine thrust
+  gearWeightTorque = n*wLg*armLg #total torque by stowed landing gear
+  mPitch = qCruise*chord(x)**2*cM #aerodynamic pitching moment per unit length
+  
+  tF = engineWeightTorque + engineThrustTorque +gearWeightTorque + np.trapezoid(mPitch,x) #twisting torque at root
+  
+  #implement macauly version of above terms
+  engineWeightMoment = -engineWeightTorque*mac(x,le,0)
+  engineThrustMoment = -engineThrustTorque*mac(x,le,0)
+  gearWeightMoment = -gearWeightTorque*mac(x,dLg,0)
+  pitchingMoment = -cumulative_trapezoid(mPitch,x,initial = 0) #pitching moment up to a point on the wing
+  
+  return tF + engineWeightMoment + engineThrustMoment + gearWeightMoment + pitchingMoment #return twisting moment at a point along the wing
+  
+
+#define function to output rate of twist at a poitn along the wing, according to Roark's stresses and strains for I-beams
+def twist(T,G,a,b,c,d,r):
+#a is flange width, b = flange thickness, c = clear web height, d = web thickness
+  
+  t = np.minimum(b,d)
+  t1 = np.maximum(b,d)
+  D = ((b+r)**2+r*d+d**2/4)/(2*r+b) #diameter of largest inscribed circle 
+  
+  alpha= t/t1 *(0.15+0.1*r/b)
+  
+  K1 = a*b**3*(1/3-0.21*b/a*(1-b**4/12/a**4))
+  K2 = 1/3*c*d**3
+  
+  return T/G/(2*K1+K2+2*alpha*D**4) #return rate of angle of twist at a point along the wing
+   
+  
   
 def curvature(m,I): #curvature at a given point, pass in arrays of values for moment and second moment of area
   return m/ (E*I)
@@ -333,6 +399,25 @@ if nStringers > 0:
   Pcr = min(np.pi**2*E*strI(lWing,cleverSol)/nStringers/maxRibGap**2,np.pi**2*E*strIt(lWing,cleverSol)/nStringers/maxRibGap**2) #compute critical load for Euler Buckling formula
   fsBuckling = Pcr/P #factor of safety with respect to buckling
 
+#angle of twist with the engine at the best location
+cx = chord(x) #chord at every point along the wing
+torqueCases = {}
+torqueCases["n = +2.5"] = twistingTorque(x, 2.5, leBest, maxEngineThrust)
+torqueCases["n = +1"] = twistingTorque(x, 1.0, leBest, maxEngineThrust)
+torqueCases["n = -1"] = twistingTorque(x, -1.0, leBest, maxEngineThrust)
+torqueCases["Engine out, dead wing"] = twistingTorque(x, 1.0, leBest, 0.0)
+
+twistMax = 0.0 #largest twist magnitude anywhere on the wing, any load case (degrees)
+caseTwistMax = "" #which load case causes it
+for name in torqueCases:
+  rate = twist(torqueCases[name], G, flangeWidth(x), flangeThick(x), webHeight(x), webThick(x), filletRadius(x))#rate of twist along the wing (rad/ft): flange width, flange thickness, web height, web thickness, fillet radius
+  theta = cumulative_trapezoid(rate, x, initial = 0) #angle of twist along the wing with twist(0) = 0 (rad)
+  thetaDeg = np.degrees(np.max(np.abs(theta))) #largest twist for this case (degrees)
+  if thetaDeg > twistMax:
+    twistMax = thetaDeg
+    caseTwistMax = name
+
+
 
 #================= below graphs all quantities in a digestible report sheet!
 
@@ -447,6 +532,7 @@ rows.append(["Critical location", critText])
 rows.append(["Spar weight / cost per wing", f"{wSpar:,.0f} lb  /  ${cost:,.0f}"])
 rows.append(["Static tip / engine deflection", f"{uStatic[-1]:.2f} ft  /  {uEngine:.2f} ft"])
 rows.append(["Flight tip deflection (n = +2.5)", f"{uFlight[-1]:.2f} ft"])
+rows.append(["Max angle of twist", f"{twistMax:.3f} deg  ({caseTwistMax}; limit 2.5 deg)"])
 if nStringers >0:
   bucklingText = f"{fsBuckling:.3g}  ({nStringers} stringers, {len(ribLocations)} ribs, largest rib gap {maxRibGap:.2f} ft)"
   rows.append(["Stringer buckling FS", bucklingText])
