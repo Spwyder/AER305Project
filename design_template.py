@@ -24,7 +24,11 @@ def strIt(x,arr): #nStringers*(own I of one stringer, drag direction) + parallel
   return nStringers*0 + strA(x)*np.sum(arr[1]**2, axis=0) #replace the 0 the same way
 
 #ribs: the 3rd location is the engine placeholder, which the script moves to the best engine position
-ribLocations = np.array([0,33.83,20*lWing/halfSpan,117.84]) #add evenly spaced ribs with np.concatenate((..., np.linspace(0, lWing, N+2)[1:-1]))
+ribLocations = np.array([0,33.83,20*lWing/halfSpan,117.84]) #4 hard-coded ribs
+#example: to also add N evenly spaced ribs between root and tip, replace the line above with the two lines below (remove the leading #).
+#here N = 130, so the ribs are lWing/131 = 0.90 ft apart; change 130 to the number of extra ribs you want.
+#ribLocations = np.concatenate((np.array([0,33.83,20*lWing/halfSpan,117.84]), #4 hard-coded ribs (engine placeholder is the 3rd)
+#                               np.linspace(0, lWing, 130+2)[1:-1])) #130 evenly spaced ribs; [1:-1] drops the root and tip, which already have ribs
 def ribsWeight(arr): #weight of each rib (0.005 in thick plate filling the 0.65c x 0.1c box, minus the spar cutout)
   return chord(arr)**2*0.65*0.1*0.005/12*rhoSpar-area(arr)*0.005/12*rhoSpar
 
